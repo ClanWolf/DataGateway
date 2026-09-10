@@ -56,8 +56,21 @@ router.get("/:id", async (req, res) => {
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
-    const fights = await db.pool.query(
-      `SELECT * FROM aux_fights af LEFT JOIN aux_fightusers au ON af.id_fight = au.fight_id WHERE af.confirmed = 0 AND au.user_id = ?`,
+    // Hole den fight
+    const fightResult = await db.pool.query(
+      `SELECT * FROM aux_fights WHERE id_fight = ? AND confirmed = 0 LIMIT 1`,
+      [req.params.id]
+    );
+
+    if (fightResult.length === 0) {
+      return res.sendStatus(404);
+    }
+
+    const fight = new AuxFight(fightResult[0]);
+
+    // Hole alle fightusers für diesen fight
+    const fightUsers = await db.pool.query(
+      `SELECT user_id, fight_id FROM aux_fightusers WHERE fight_id = ?`,
       [req.params.id]
     );
 
@@ -65,32 +78,10 @@ router.get("/:id", async (req, res) => {
       "Auxfight record with id " + req.params.id + " requested from ip: " + ip
     );
 
-    if (fights.length > 0) {
-      const fight = new AuxFight(fights[0]);
-      
-      // Sammle alle unique aux_fightusers für diesen fight
-      const fightUsers = [];
-      const seenUserIds = new Set();
-      
-      for (const row of fights) {
-        if (row.user_id && !seenUserIds.has(row.user_id)) {
-          seenUserIds.add(row.user_id);
-          fightUsers.push({
-            user_id: row.user_id,
-            fight_id: row.fight_id
-            // Weitere Felder aus aux_fightusers hinzufügen je nach Bedarf
-          });
-        }
-      }
-      
-      // Rückgabe mit fight und fightusers
-      res.status(200).json({
-        fight: fight,
-        fightusers: fightUsers
-      });
-    } else {
-      res.sendStatus(404);
-    }
+    res.status(200).json({
+      fight: fight,
+      fightusers: fightUsers
+    });
   } catch (err) {
     logger.error("Failed to load auxfight record: " + err.message);
     res.status(500).json({ message: "Server error" });
