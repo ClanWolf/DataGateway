@@ -53,12 +53,25 @@ router.get("/:id", async (req, res) => {
     #swagger.responses[404] = { description: 'No visible fight for this user' }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
-    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
+      const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
-    // Hole den fight
+    // Finde den fight für diese user_id
     const fightResult = await db.pool.query(
-      `SELECT * FROM aux_fights WHERE id_fight = ? AND confirmed = 0 LIMIT 1`,
+      `
+        SELECT DISTINCT af.*
+        FROM aux_fights af
+        LEFT JOIN aux_fightusers au ON af.id_fight = au.fight_id
+        WHERE (
+          af.confirmed = 0
+          OR (
+            af.winnerfaction_id IS NOT NULL
+            AND af.winnerfaction_id > 0
+          )
+        )
+        AND au.user_id = ?
+        LIMIT 1
+      `,
       [req.params.id]
     );
 
@@ -67,11 +80,12 @@ router.get("/:id", async (req, res) => {
     }
 
     const fight = new AuxFight(fightResult[0]);
+    const fightId = fightResult[0].id_fight;
 
     // Hole alle fightusers für diesen fight
     const fightUsers = await db.pool.query(
-      `SELECT user_id, fight_id FROM aux_fightusers WHERE fight_id = ?`,
-      [req.params.id]
+      `SELECT user_id, fight_id, faction_id, fightcreator FROM aux_fightusers WHERE fight_id = ?`,
+      [fightId]
     );
 
     logger.info(
@@ -87,7 +101,6 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 router.post("/", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
