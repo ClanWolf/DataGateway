@@ -53,38 +53,47 @@ router.get("/:id", async (req, res) => {
     #swagger.responses[404] = { description: 'No visible fight for this user' }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
-   const fights = await db.pool.query(
-    `
-      SELECT *
-      FROM aux_fights af
-      LEFT JOIN aux_fightusers au
-        ON af.id_fight = au.fight_id
-      WHERE (
-        af.confirmed = 0
-        OR (
-          af.winnerfaction_id IS NOT NULL
-          AND af.winnerfaction_id > 0
-        )
-      )
-      AND au.user_id = ?
-      LIMIT 1
-    `,
-    [req.params.id]
-  );
+    const fights = await db.pool.query(
+      `SELECT * FROM aux_fights af LEFT JOIN aux_fightusers au ON af.id_fight = au.fight_id WHERE af.confirmed = 0 AND au.user_id = ? LIMIT 1`,
+      [req.params.id]
+    );
 
     logger.info(
       "Auxfight record with id " + req.params.id + " requested from ip: " + ip
     );
 
-    fights.length > 0
-      ? res.status(200).json(new AuxFight(fights[0]))
-      : res.sendStatus(404);
+    if (fights.length > 0) {
+      const fight = new AuxFight(fights[0]);
+      
+      // Sammle alle unique aux_fightusers für diesen fight
+      const fightUsers = [];
+      const seenUserIds = new Set();
+      
+      for (const row of fights) {
+        if (row.user_id && !seenUserIds.has(row.user_id)) {
+          seenUserIds.add(row.user_id);
+          fightUsers.push({
+            user_id: row.user_id,
+            fight_id: row.fight_id
+            // Weitere Felder aus aux_fightusers hinzufügen je nach Bedarf
+          });
+        }
+      }
+      
+      // Rückgabe mit fight und fightusers
+      res.status(200).json({
+        fight: fight,
+        fightusers: fightUsers
+      });
+    } else {
+      res.sendStatus(404);
+    }
   } catch (err) {
     logger.error("Failed to load auxfight record: " + err.message);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
