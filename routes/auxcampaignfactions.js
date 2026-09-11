@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
-    const campaignFactions = await db.pool.query(`SELECT ac.*, c.Name_en, c.Name_de  FROM ${TABLE_NAME} ac LEFT JOIN c3_FACTION c ON (ac.faction_id = c.ID)`);
+    const campaignFactions = await db.pool.query(`SELECT ac.*, c.Name_en, c.Name_de, c.Logo  FROM ${TABLE_NAME} ac LEFT JOIN c3_FACTION c ON (ac.faction_id = c.ID)`);
     const auxCampaignFactions = campaignFactions.map((cf) => new AuxCampaignFaction(cf));
     logger.info("List of all auxcampaignfaction records requested from ip: " + ip);
 
