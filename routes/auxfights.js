@@ -65,6 +65,7 @@ router.get("/:id", async (req, res) => {
         WHERE (
           af.confirmed = 0
           OR (
+            af.confirmed = 0 AND
             af.winnerfaction_id IS NOT NULL
             AND af.winnerfaction_id > 0
           )
