@@ -92,6 +92,26 @@ router.post("/", async (req, res) => {
         .json({ message: "No valid auxuser fields provided" });
     }
 
+    if (payloadColumns.includes("username")) {
+      const existingUsers = await db.pool.query(
+        `SELECT 1 FROM ${TABLE_NAME} WHERE \`username\` = ? LIMIT 1`,
+        [payload.username]
+      );
+
+      if (existingUsers.length > 0) {
+        logger.warn(
+          "Attempted creation of existing auxuser '" +
+            payload.username +
+            "' from ip: " +
+            ip
+        );
+
+        return res.status(403).json({
+          message: "An auxuser with this username already exists",
+        });
+      }
+    }
+
     const columns = payloadColumns.map((column) => `\`${column}\``).join(", ");
     const placeholders = payloadColumns.map(() => "?").join(", ");
     const values = payloadColumns.map((column) => payload[column]);
