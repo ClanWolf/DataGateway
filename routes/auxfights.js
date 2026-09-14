@@ -109,7 +109,7 @@ router.get("/:id/history", async (req, res) => {
     #swagger.summary = 'Get all fights of a user including participants'
     #swagger.description = 'Returns all auxiliary fights associated with the supplied user ID, including all participating users.'
     #swagger.parameters['id'] = { description: 'User ID', required: true, type: 'integer' }
-    #swagger.responses[200] = { description: 'Auxiliary fights with participants' }
+    #swagger.responses[200] = { description: 'Auxiliary fights with participants and usernames', schema: { $ref: '#/definitions/AuxFightHistory' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;

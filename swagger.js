@@ -32,6 +32,37 @@ const doc = {
       type: 'array',
       items: { $ref: '#/definitions/AuxFight' },
     },
+    AuxFightUser: {
+      type: 'object',
+      properties: {
+        id_fightusers: { type: 'integer', example: 12 },
+        fight_id: { type: 'integer', example: 42 },
+        user_id: { type: 'integer', example: 101 },
+        faction_id: { type: 'integer', example: 3 },
+        fightcreator: { type: 'integer', enum: [0, 1], example: 1 },
+        updated: { type: 'string', example: '2026-09-14T10:00:00.000Z' },
+        username: { type: 'string', example: 'ClanWolf' },
+      },
+    },
+    AuxFightHistoryItem: {
+      type: 'object',
+      properties: {
+        fight: { $ref: '#/definitions/AuxFight' },
+        fightusers: {
+          type: 'array',
+          items: { $ref: '#/definitions/AuxFightUser' },
+        },
+      },
+    },
+    AuxFightHistory: {
+      type: 'object',
+      properties: {
+        fights: {
+          type: 'array',
+          items: { $ref: '#/definitions/AuxFightHistoryItem' },
+        },
+      },
+    },
     CreateAuxFightRequest: {
       type: 'object',
       required: [

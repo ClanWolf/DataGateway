@@ -505,6 +505,43 @@
         }
       }
     },
+    "/auxfights/{id}/history": {
+      "get": {
+        "tags": [
+          "Auxiliary fights"
+        ],
+        "summary": "Get all fights of a user including participants",
+        "description": "Returns all auxiliary fights associated with the supplied user ID, including all participating users.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "User ID"
+          },
+          {
+            "name": "x-forwarded-for",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auxiliary fights with participants and usernames",
+            "schema": {
+              "$ref": "#/definitions/AuxFightHistory"
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
     "/auxfights/{id}/cancel": {
       "patch": {
         "tags": [
@@ -758,6 +795,18 @@
             "name": "x-forwarded-for",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -766,6 +815,9 @@
           },
           "400": {
             "description": "Bad Request"
+          },
+          "403": {
+            "description": "Forbidden"
           },
           "500": {
             "description": "Internal Server Error"
@@ -953,6 +1005,176 @@
         },
         "items": {
           "$ref": "#/definitions/AuxFight"
+        }
+      }
+    },
+    "AuxFightUser": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "object"
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "id_fightusers": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 12
+                }
+              }
+            },
+            "fight_id": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 42
+                }
+              }
+            },
+            "user_id": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 101
+                }
+              }
+            },
+            "faction_id": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 3
+                }
+              }
+            },
+            "fightcreator": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "enum": {
+                  "type": "array",
+                  "example": [
+                    0,
+                    1
+                  ],
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "example": {
+                  "type": "number",
+                  "example": 1
+                }
+              }
+            },
+            "updated": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "string"
+                },
+                "example": {
+                  "type": "string",
+                  "example": "2026-09-14T10:00:00.000Z"
+                }
+              }
+            },
+            "username": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "string"
+                },
+                "example": {
+                  "type": "string",
+                  "example": "ClanWolf"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "AuxFightHistoryItem": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "object"
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "fight": {
+              "$ref": "#/definitions/AuxFight"
+            },
+            "fightusers": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "array"
+                },
+                "items": {
+                  "$ref": "#/definitions/AuxFightUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "AuxFightHistory": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "object"
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "fights": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "array"
+                },
+                "items": {
+                  "$ref": "#/definitions/AuxFightHistoryItem"
+                }
+              }
+            }
+          }
         }
       }
     },
