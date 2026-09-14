@@ -102,6 +102,87 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.get("/:id/history", async (req, res) => {
+  /*
+    #swagger.tags = ['Auxiliary fights']
+    #swagger.summary = 'Get all fights of a user including participants'
+    #swagger.description = 'Returns all auxiliary fights associated with the supplied user ID, including all participating users.'
+    #swagger.parameters['id'] = { description: 'User ID', required: true, type: 'integer' }
+    #swagger.responses[200] = { description: 'Auxiliary fights with participants' }
+    #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
+  */
+  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
+
+  try {
+    // Alle Fights ermitteln, an denen :id beteiligt ist.
+    const fightResult = await db.pool.query(
+        `
+          SELECT DISTINCT af.*
+          FROM aux_fights af
+                 INNER JOIN aux_fightusers requested_user
+                            ON requested_user.fight_id = af.id_fight
+          WHERE requested_user.user_id = ?
+          ORDER BY af.updated DESC
+        `,
+        [req.params.id]
+    );
+
+    if (fightResult.length === 0) {
+      return res.status(200).json({ fights: [] });
+    }
+
+    const fightIds = fightResult.map((fight) => fight.id_fight);
+    const placeholders = fightIds.map(() => "?").join(", ");
+
+    // Alle Teilnehmer der gefundenen Fights inklusive Namen laden.
+    const fightUsers = await db.pool.query(
+        `
+        SELECT
+          afu.id_fightusers,
+          afu.fight_id,
+          afu.user_id,
+          afu.faction_id,
+          afu.fightcreator,
+          afu.updated,
+          au.username
+        FROM aux_fightusers afu
+        INNER JOIN aux_users au ON au.id_user = afu.user_id
+        WHERE afu.fight_id IN (${placeholders})
+        ORDER BY afu.fight_id, afu.fightcreator DESC
+      `,
+        fightIds
+    );
+
+    // fightusers per fight_id gruppieren.
+    const fightUsersByFightId = new Map();
+
+    for (const fightUser of fightUsers) {
+      const fightId = String(fightUser.fight_id);
+
+      if (!fightUsersByFightId.has(fightId)) {
+        fightUsersByFightId.set(fightId, []);
+      }
+
+      fightUsersByFightId.get(fightId).push(fightUser);
+    }
+
+    const fights = fightResult.map((fightData) => ({
+      fight: new AuxFight(fightData),
+      fightusers: fightUsersByFightId.get(String(fightData.id_fight)) || [],
+    }));
+
+    logger.info(
+        "Auxfight history for user " + req.params.id + " requested from ip: " + ip
+    );
+
+    return res.status(200).json({ fights });
+  } catch (err) {
+    logger.error("Failed to load auxfight history: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.post("/", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
