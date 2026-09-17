@@ -47,11 +47,11 @@ router.get("/", async (req, res) => {
     // Query to sum all values from c3_SCORE table matching the criteria
     const result = await db.pool.query(
       `
-        SELECT COALESCE(SUM(score), 0) as totalScore
+        SELECT COALESCE(SUM(PCP), 0) as totalScore
         FROM ${TABLE_NAME}
-        WHERE season_id = ?
-          AND attack_id = ?
-          AND faction_id = ?
+        WHERE SeasonId = ?
+          AND Attackid = ?
+          AND Factionid = ?
       `,
       [seasonIdInt, attackIdInt, factionIdInt]
     );
