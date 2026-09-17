@@ -68,6 +68,7 @@ app.use("/auxcampaignfactions", require("./routes/auxcampaignfactions.js"));
 app.use("/auxfights", require("./routes/auxfights.js"));
 app.use("/auxfightusers", require("./routes/auxfightusers.js"));
 app.use("/auxusers", require("./routes/auxusers.js"));
+app.use("/score", require("./routes/score.js"));
 //app.use("/units", require("./routes/units"));
 
 app.use("/", async (req, res) => {

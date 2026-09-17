@@ -853,6 +853,86 @@
           }
         }
       }
+    },
+    "/score/": {
+      "get": {
+        "tags": [
+          "Score"
+        ],
+        "summary": "Get sum of scores filtered by season, attack and faction",
+        "description": "",
+        "parameters": [
+          {
+            "name": "x-forwarded-for",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "seasonid",
+            "description": "Season ID to filter by",
+            "required": true,
+            "type": "integer",
+            "in": "query"
+          },
+          {
+            "name": "attackid",
+            "description": "Attack ID to filter by",
+            "required": true,
+            "type": "integer",
+            "in": "query"
+          },
+          {
+            "name": "factionid",
+            "description": "Faction ID to filter by",
+            "required": true,
+            "type": "integer",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sum of scores",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "object"
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {
+                    "sum": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "example": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required parameters",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "500": {
+            "description": "Database error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
