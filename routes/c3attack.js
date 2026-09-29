@@ -38,25 +38,46 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
+router.get("/:seasonId", async (req, res) => {
+  const ip =
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    null;
 
   try {
     const attacks = await db.pool.query(
-      `SELECT * FROM ${TABLE_NAME} WHERE \`${PRIMARY_KEY_COLUMN}\` = ? LIMIT 1`,
-      [req.params.id]
+      `SELECT
+          a.ID,
+          a.Season,
+          ss.Name,
+          a.Round
+       FROM c3_ATTACK a
+       JOIN c3_STARSYSTEM ss
+         ON ss.ID = a.StarSystemID
+       WHERE a.Season = ?`,
+      [req.params.seasonId]
+    );
+
+    const c3Attacks = attacks.map(
+      (attack) => new C3Attack(attack)
     );
 
     logger.info(
-      "c3_ATTACK record with id " + req.params.id + " requested from ip: " + ip
+      "c3_ATTACK records for season " +
+        req.params.seasonId +
+        " requested from ip: " +
+        ip
     );
 
-    attacks.length > 0
-      ? res.status(200).json(new C3Attack(attacks[0]))
-      : res.sendStatus(404);
+    res.status(200).json(c3Attacks);
   } catch (err) {
-    logger.error("Failed to load c3_ATTACK record: " + err.message);
-    res.status(500).json({ message: "Server error" });
+    logger.error(
+      "Failed to load c3_ATTACK records: " + err.message
+    );
+
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 });
 
