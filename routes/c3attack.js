@@ -65,6 +65,8 @@ router.get("/:seasonId", async (req, res) => {
       [req.params.seasonId]
     );
 
+    console.log(attacks);
+
     const c3Attacks = attacks.map(
       (attack) => new C3Attack(attack)
     );
