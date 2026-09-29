@@ -936,23 +936,12 @@
     },
     "/c3attack/": {
       "get": {
-        "tags": [
-          "C3 Attack"
-        ],
-        "summary": "Get all attacks of a given season",
         "description": "",
         "parameters": [
           {
             "name": "x-forwarded-for",
             "in": "header",
             "type": "string"
-          },
-          {
-            "name": "seasonId",
-            "description": "ID of the given season",
-            "required": true,
-            "type": "integer",
-            "in": "query"
           }
         ],
         "responses": {
@@ -988,13 +977,18 @@
     },
     "/c3attack/{seasonId}": {
       "get": {
+        "tags": [
+          "C3 Attack"
+        ],
+        "summary": "Get all attacks of a given season",
         "description": "",
         "parameters": [
           {
             "name": "seasonId",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "integer",
+            "description": "ID of the given season"
           },
           {
             "name": "x-forwarded-for",

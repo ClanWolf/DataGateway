@@ -24,13 +24,6 @@ async function getWritableColumns() {
 }
 
 router.get("/", async (req, res) => {
-  /*
-  #swagger.tags = ['C3 Attack']
-  #swagger.summary = 'Get all attacks of a given season'
-  #swagger.parameters['seasonId'] = { description: 'ID of the given season', required: true, type: 'integer' }
-*/
-
-
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
@@ -46,6 +39,13 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/:seasonId", async (req, res) => {
+
+  /*
+  #swagger.tags = ['C3 Attack']
+  #swagger.summary = 'Get all attacks of a given season'
+  #swagger.parameters['seasonId'] = { description: 'ID of the given season', required: true, type: 'integer' }
+  */
+
   const ip =
     req.headers["x-forwarded-for"] ||
     req.socket.remoteAddress ||
