@@ -38,12 +38,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:seasonId", async (req, res) => {
+router.get("/season/:seasonId/list", async (req, res) => {
 
   /*
   #swagger.tags = ['C3 Attack']
   #swagger.summary = 'Get all attacks of a given season'
   #swagger.parameters['seasonId'] = { description: 'ID of the given season', required: true, type: 'integer' }
+  #swagger.responses[200] = {
+    description: 'List of attacks for the given season',
+    schema: {
+      type: 'array',
+      items: { $ref: '#/definitions/C3Attack' }
+    }
+  }
+  #swagger.responses[404] = {
+    description: 'No attacks found for the given season',
+    schema: {
+      message: 'No attacks found for season {seasonId}'
+    }
+  }
+  #swagger.responses[500] = {
+    description: 'Server error',
+    schema: {
+      message: 'Server error'
+    }
+  }
   */
 
   const ip =
@@ -65,7 +84,11 @@ router.get("/:seasonId", async (req, res) => {
       [req.params.seasonId]
     );
 
-    console.log(attacks);
+    if(attacks.length === 0) {
+      return  res.status(404).json({
+        message: "No attacks found for season " + req.params.seasonId,
+      });
+    }
 
     const c3Attacks = attacks.map(
       (attack) => new C3Attack(attack)

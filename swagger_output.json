@@ -975,7 +975,7 @@
         }
       }
     },
-    "/c3attack/{seasonId}": {
+    "/c3attack/season/{seasonId}/list": {
       "get": {
         "tags": [
           "C3 Attack"
@@ -998,10 +998,52 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "List of attacks for the given season",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "array"
+                },
+                "items": {
+                  "$ref": "#/definitions/C3Attack"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
+          },
+          "404": {
+            "description": "No attacks found for the given season",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "No attacks found for season {seasonId}"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "500": {
-            "description": "Internal Server Error"
+            "description": "Server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Server error"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           }
         }
       }
