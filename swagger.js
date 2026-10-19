@@ -20,6 +20,7 @@ const doc = {
       properties: {
         id_fight: { type: 'string', example: '42' },
         fight_name: { type: 'string', example: 'Battle of Tukayyid' },
+        fight_teamsize: { type: 'integer', minimum: 1, maximum: 2147483647, default: 1, example: 3, description: 'Player count used as the PCP_AUX multiplier.' },
         confirmed: { type: 'integer', enum: [0, 1], example: 0 },
         campaign_id: { type: 'integer', nullable: true, example: 7 },
         c3_attack_id: { type: 'integer', nullable: true, example: 15 },
@@ -78,6 +79,7 @@ const doc = {
         opponent_faction_id: { type: 'integer', example: 2 },
         campaign_id: { type: 'integer', nullable: true, example: 7 },
         fight_name: { type: 'string', example: 'Battle of Tukayyid' },
+        fight_teamsize: { type: 'integer', minimum: 1, maximum: 2147483647, default: 1, example: 3, description: 'Optional; defaults to 1 for existing clients.' },
       },
     },
     CreatedAuxFight: {
@@ -85,6 +87,7 @@ const doc = {
       properties: {
         id_fight: { type: 'string', example: '42' },
         fight_name: { type: 'string', example: 'Battle of Tukayyid' },
+        fight_teamsize: { type: 'integer', minimum: 1, maximum: 2147483647, default: 1, example: 3 },
         confirmed: { type: 'boolean', example: false },
         campaign_id: { type: 'integer', nullable: true, example: 7 },
         winnerfaction_id: { type: 'integer', nullable: true, example: null },

@@ -3,6 +3,8 @@ class AuxFight {
   constructor(data) {
     this.id_fight = data.id_fight;
     this.fight_name = data.fight_name;
+    const teamSize = Number(data.fight_teamsize);
+    this.fight_teamsize = Number.isSafeInteger(teamSize) && teamSize > 0 ? teamSize : 1;
     this.confirmed = data.confirmed;
     this.campaign_id = data.campaign_id;
     this.c3_attack_id = data.c3_attack_id;

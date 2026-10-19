@@ -577,7 +577,7 @@
             }
           },
           "409": {
-            "description": "Fight already submitted or completed",
+            "description": "Fight already completed",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -596,7 +596,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Confirm an auxiliary fight and create or update its PCP score exactly once",
+        "summary": "Confirm an auxiliary fight and create or update its PCP score exactly once, or reject the submitted result",
         "description": "",
         "parameters": [
           {
@@ -1110,6 +1110,35 @@
                 }
               }
             },
+            "fight_teamsize": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "minimum": {
+                  "type": "number",
+                  "example": 1
+                },
+                "maximum": {
+                  "type": "number",
+                  "example": 2147483647
+                },
+                "default": {
+                  "type": "number",
+                  "example": 1
+                },
+                "example": {
+                  "type": "number",
+                  "example": 3
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Player count used as the PCP_AUX multiplier."
+                }
+              }
+            },
             "confirmed": {
               "type": "object",
               "properties": {
@@ -1499,6 +1528,35 @@
                   "example": "Battle of Tukayyid"
                 }
               }
+            },
+            "fight_teamsize": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "minimum": {
+                  "type": "number",
+                  "example": 1
+                },
+                "maximum": {
+                  "type": "number",
+                  "example": 2147483647
+                },
+                "default": {
+                  "type": "number",
+                  "example": 1
+                },
+                "example": {
+                  "type": "number",
+                  "example": 3
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Optional; defaults to 1 for existing clients."
+                }
+              }
             }
           }
         }
@@ -1537,6 +1595,31 @@
                 "example": {
                   "type": "string",
                   "example": "Battle of Tukayyid"
+                }
+              }
+            },
+            "fight_teamsize": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "minimum": {
+                  "type": "number",
+                  "example": 1
+                },
+                "maximum": {
+                  "type": "number",
+                  "example": 2147483647
+                },
+                "default": {
+                  "type": "number",
+                  "example": 1
+                },
+                "example": {
+                  "type": "number",
+                  "example": 3
                 }
               }
             },

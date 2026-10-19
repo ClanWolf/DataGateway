@@ -202,6 +202,7 @@ router.post("/", async (req, res) => {
     opponent_faction_id,
     campaign_id = null,
     fight_name = "fight",
+    fight_teamsize = 1,
   } = req.body || {};
 
   let connection;
@@ -242,6 +243,12 @@ router.post("/", async (req, res) => {
       });
     }
 
+    if (!Number.isSafeInteger(fight_teamsize) || fight_teamsize < 1 || fight_teamsize > 2147483647) {
+      return res.status(400).json({
+        message: "fight_teamsize must be a positive integer no greater than 2147483647",
+      });
+    }
+
     if (typeof fight_name !== "string" || fight_name.trim().length === 0) {
       return res.status(400).json({
         message: "fight_name must be a non-empty string",
@@ -264,14 +271,15 @@ router.post("/", async (req, res) => {
       `
         INSERT INTO aux_fights (
           fight_name,
+          fight_teamsize,
           confirmed,
           capmaign_id,
           c3_attack_id,
           winnerfaction_id
         )
-        VALUES (?, 0, ?, NULL, NULL)
+        VALUES (?, ?, 0, ?, NULL, NULL)
       `,
-      [fight_name.trim(), campaign_id]
+      [fight_name.trim(), fight_teamsize, campaign_id]
     );
 
     const fightId = fightResult.insertId;
@@ -325,6 +333,7 @@ router.post("/", async (req, res) => {
     return res.status(201).json({
       id_fight: fightId.toString(),
       fight_name: fight_name.trim(),
+      fight_teamsize,
       confirmed: false,
       campaign_id,
       winnerfaction_id: null,
@@ -455,7 +464,7 @@ router.patch("/:id/confirmed", async (req, res) => {
     connection = await db.pool.getConnection();
     await connection.beginTransaction();
     const fights = await connection.query(
-      "SELECT confirmed, winnerfaction_id, c3_attack_id FROM aux_fights WHERE id_fight = ? FOR UPDATE",
+      "SELECT confirmed, winnerfaction_id, c3_attack_id, fight_teamsize FROM aux_fights WHERE id_fight = ? FOR UPDATE",
       [fightId]
     );
 
@@ -496,6 +505,11 @@ router.patch("/:id/confirmed", async (req, res) => {
         !Number.isFinite(Number(references[0].Value))) {
       return res.status(409).json({ message: "PCP_AUX reference is missing or invalid" });
     }
+    const teamSize = new AuxFight(fight).fight_teamsize;
+    const pcpAward = Number(references[0].Value) * teamSize;
+    if (!Number.isFinite(pcpAward)) {
+      return res.status(409).json({ message: "Calculated PCP award is invalid" });
+    }
     const attacks = await connection.query(
       "SELECT Season FROM c3_ATTACK WHERE ID = ?",
       [fight.c3_attack_id]
@@ -524,12 +538,12 @@ router.patch("/:id/confirmed", async (req, res) => {
     if (scores.length === 0) {
       await connection.query(
         "INSERT INTO c3_SCORE (SeasonId, AttackID, FactionID, PCP) VALUES (?, ?, ?, ?)",
-        [seasonId, fight.c3_attack_id, fight.winnerfaction_id, references[0].Value]
+        [seasonId, fight.c3_attack_id, fight.winnerfaction_id, pcpAward]
       );
     } else {
       await connection.query(
         "UPDATE c3_SCORE SET PCP = COALESCE(PCP, 0) + ? WHERE FactionID = ? AND AttackID = ? AND SeasonId = ?",
-        [references[0].Value, fight.winnerfaction_id, fight.c3_attack_id, seasonId]
+        [pcpAward, fight.winnerfaction_id, fight.c3_attack_id, seasonId]
       );
     }
     await connection.query("UPDATE aux_fights SET confirmed = 1 WHERE id_fight = ?", [fightId]);
