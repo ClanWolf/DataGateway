@@ -9,7 +9,8 @@ class AuxCampaignFaction {
         de: data.Name_de,
         en: data.Name_en
       },
-      logo: data.Logo
+      logo: data.Logo,
+      color: data.Color
     };
     this.updated = data.updated;
   }
