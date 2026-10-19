@@ -16,8 +16,17 @@ Omitting it defaults to 1 so existing clients continue to work. Explicit NULL,
 zero, negative, fractional and string values are rejected with HTTP 400.
 Fight responses include the team size; legacy missing/invalid values read as 1.
 On the first successful confirmation, the awarded PCP are
-`PCP_AUX × fight_teamsize`. Only this new award is added to an existing score;
-the previous total is not multiplied. Repeated confirmations do not award again.
+`PCP_AUX × fight_teamsize`. Each confirmed fight inserts a new `c3_SCORE` row:
+`FactionID` is the winning faction, `AttackID` is the selected `c3_attack_id`,
+and `SeasonId` comes from that attack. Existing score rows are never updated,
+even when multiple rows already share this faction/attack/season combination.
+`GET /score` continues to return the sum of all matching rows. Repeated
+confirmations of the same fight do not award again; insertion and confirmation
+are committed together under the fight's row lock. Rejecting a result awards no PCP.
+
+The `c3_SCORE` schema must allow multiple rows per faction/attack/season;
+a unique constraint on that combination would prevent these individual awards.
+Previously aggregated rows are retained unchanged, not split retroactively.
 
 Run isolated API regression tests without a database: `node --test test/*.test.js`.
 

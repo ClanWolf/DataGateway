@@ -596,7 +596,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Confirm an auxiliary fight and create or update its PCP score exactly once, or reject the submitted result",
+        "summary": "Confirm an auxiliary fight and insert its own PCP score row exactly once, or reject the submitted result",
         "description": "",
         "parameters": [
           {
@@ -640,19 +640,13 @@
             }
           },
           "409": {
-            "description": "Fight not ready, score reference missing or score rows ambiguous",
+            "description": "Fight already completed, result incomplete, PCP reference invalid or planet fight season invalid",
             "schema": {
               "$ref": "#/definitions/Error"
             }
           },
           "500": {
             "description": "Database error",
-            "schema": {
-              "$ref": "#/definitions/Error"
-            }
-          },
-          "503": {
-            "description": "Score is being updated by another request",
             "schema": {
               "$ref": "#/definitions/Error"
             }

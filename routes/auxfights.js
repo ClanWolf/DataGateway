@@ -432,14 +432,13 @@ router.patch("/:id/cancel", async (req, res) => {
 router.patch("/:id/confirmed", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
-    #swagger.summary = 'Confirm an auxiliary fight and create or update its PCP score exactly once, or reject the submitted result'
+    #swagger.summary = 'Confirm an auxiliary fight and insert its own PCP score row exactly once, or reject the submitted result'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/ConfirmationUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated confirmation status', schema: { $ref: '#/definitions/ConfirmationUpdate' } }
     #swagger.responses[400] = { description: 'Invalid confirmation status', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
-    #swagger.responses[409] = { description: 'Fight not ready, score reference missing or score rows ambiguous', schema: { $ref: '#/definitions/Error' } }
-    #swagger.responses[503] = { description: 'Score is being updated by another request', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[409] = { description: 'Fight already completed, result incomplete, PCP reference invalid or planet fight season invalid', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip =
@@ -449,7 +448,6 @@ router.patch("/:id/confirmed", async (req, res) => {
   const { confirmed } = req.body || {};
   let connection;
   let committed = false;
-  let scoreLockName;
 
   try {
     if (!Number.isSafeInteger(fightId) || fightId <= 0) {
@@ -519,33 +517,13 @@ router.patch("/:id/confirmed", async (req, res) => {
       return res.status(409).json({ message: "Planet fight has no valid season" });
     }
 
-    // Different aux fights can award the same faction/attack. Serialize the
-    // check/insert pair across all gateway instances, even without a unique index.
-    const lockName = `pcp-aux:${fight.c3_attack_id}:${fight.winnerfaction_id}`;
-    const locks = await connection.query("SELECT GET_LOCK(?, 10) AS acquired", [lockName]);
-    if (Number(locks[0]?.acquired) !== 1) {
-      return res.status(503).json({ message: "Score is busy; please retry confirmation" });
-    }
-    scoreLockName = lockName;
-
-    const scores = await connection.query(
-      "SELECT FactionID, AttackID FROM c3_SCORE WHERE FactionID = ? AND AttackID = ? AND SeasonId = ? FOR UPDATE",
-      [fight.winnerfaction_id, fight.c3_attack_id, seasonId]
+    // Each confirmed aux fight gets a separate award, even for the same
+    // faction/attack/season. The fight row locked above prevents duplicate
+    // awards on retries; insert and confirmation commit atomically.
+    await connection.query(
+      "INSERT INTO c3_SCORE (SeasonId, AttackID, FactionID, PCP) VALUES (?, ?, ?, ?)",
+      [seasonId, fight.c3_attack_id, fight.winnerfaction_id, pcpAward]
     );
-    if (scores.length > 1) {
-      return res.status(409).json({ message: "Multiple score rows for winner and attack" });
-    }
-    if (scores.length === 0) {
-      await connection.query(
-        "INSERT INTO c3_SCORE (SeasonId, AttackID, FactionID, PCP) VALUES (?, ?, ?, ?)",
-        [seasonId, fight.c3_attack_id, fight.winnerfaction_id, pcpAward]
-      );
-    } else {
-      await connection.query(
-        "UPDATE c3_SCORE SET PCP = COALESCE(PCP, 0) + ? WHERE FactionID = ? AND AttackID = ? AND SeasonId = ?",
-        [pcpAward, fight.winnerfaction_id, fight.c3_attack_id, seasonId]
-      );
-    }
     await connection.query("UPDATE aux_fights SET confirmed = 1 WHERE id_fight = ?", [fightId]);
     await connection.commit();
     committed = true;
@@ -571,10 +549,6 @@ router.patch("/:id/confirmed", async (req, res) => {
       if (!committed) {
         try { await connection.rollback(); }
         catch (err) { logger.error("Failed to rollback confirmation: " + err.message); }
-      }
-      if (scoreLockName) {
-        try { await connection.query("SELECT RELEASE_LOCK(?)", [scoreLockName]); }
-        catch (err) { logger.error("Failed to release score lock: " + err.message); }
       }
       connection.release();
     }

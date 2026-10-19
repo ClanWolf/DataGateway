@@ -72,16 +72,17 @@ router.get("/season/:seasonId/list", async (req, res) => {
 
   try {
     const attacks = await db.pool.query(
-      `SELECT
-          a.ID,
-          a.Season,
-          ss.Name,
-          a.Round
-       FROM c3_ATTACK a
-       JOIN c3_STARSYSTEM ss
-         ON ss.ID = a.StarSystemID
-       WHERE a.Season = ?`,
-      [req.params.seasonId]
+        `SELECT
+           a.ID,
+           a.Season,
+           ss.Name,
+           a.Round
+         FROM c3_ATTACK a
+                JOIN c3_STARSYSTEM ss
+                     ON ss.ID = a.StarSystemID
+         WHERE a.Season = ?
+           AND a.FactionID_Winner IS NULL`,
+        [req.params.seasonId]
     );
 
     if(attacks.length === 0) {
