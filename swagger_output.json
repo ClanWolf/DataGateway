@@ -596,7 +596,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Confirm an auxiliary fight and award PCP exactly once",
+        "summary": "Confirm an auxiliary fight and create or update its PCP score exactly once",
         "description": "",
         "parameters": [
           {
@@ -640,13 +640,19 @@
             }
           },
           "409": {
-            "description": "Fight not ready to confirm or score row unavailable",
+            "description": "Fight not ready, score reference missing or score rows ambiguous",
             "schema": {
               "$ref": "#/definitions/Error"
             }
           },
           "500": {
             "description": "Database error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Score is being updated by another request",
             "schema": {
               "$ref": "#/definitions/Error"
             }
