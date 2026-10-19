@@ -576,6 +576,12 @@
               "$ref": "#/definitions/Error"
             }
           },
+          "409": {
+            "description": "Fight already submitted or completed",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "500": {
             "description": "Database error",
             "schema": {
@@ -590,7 +596,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Set auxiliary-fight confirmation status",
+        "summary": "Confirm an auxiliary fight and award PCP exactly once",
         "description": "",
         "parameters": [
           {
@@ -633,6 +639,12 @@
               "$ref": "#/definitions/Error"
             }
           },
+          "409": {
+            "description": "Fight not ready to confirm or score row unavailable",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
           "500": {
             "description": "Database error",
             "schema": {
@@ -647,7 +659,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Set the winning faction of an auxiliary fight",
+        "summary": "Submit the winning faction and planet fight (no PCP awarded yet)",
         "description": "",
         "parameters": [
           {
@@ -686,6 +698,12 @@
           },
           "404": {
             "description": "Fight not found",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "409": {
+            "description": "Fight already submitted or completed",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1798,7 +1816,8 @@
         "required": {
           "type": "array",
           "example": [
-            "winnerfaction_id"
+            "winnerfaction_id",
+            "c3_attack_id"
           ],
           "items": {
             "type": "string"
@@ -1817,6 +1836,19 @@
                 "example": {
                   "type": "number",
                   "example": 3
+                }
+              }
+            },
+            "c3_attack_id": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 15
                 }
               }
             }
@@ -1857,6 +1889,19 @@
                 "example": {
                   "type": "number",
                   "example": 3
+                }
+              }
+            },
+            "c3_attack_id": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "integer"
+                },
+                "example": {
+                  "type": "number",
+                  "example": 15
                 }
               }
             }

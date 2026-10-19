@@ -124,14 +124,18 @@ const doc = {
     },
     WinnerUpdateRequest: {
       type: 'object',
-      required: ['winnerfaction_id'],
-      properties: { winnerfaction_id: { type: 'integer', example: 3 } },
+      required: ['winnerfaction_id', 'c3_attack_id'],
+      properties: {
+        winnerfaction_id: { type: 'integer', example: 3 },
+        c3_attack_id: { type: 'integer', example: 15 },
+      },
     },
     WinnerUpdate: {
       type: 'object',
       properties: {
         id_fight: { type: 'string', example: '42' },
         winnerfaction_id: { type: 'integer', example: 3 },
+        c3_attack_id: { type: 'integer', example: 15 },
       },
     },
     AuxCampaignFaction: {

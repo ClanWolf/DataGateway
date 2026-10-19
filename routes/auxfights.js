@@ -372,6 +372,7 @@ router.patch("/:id/cancel", async (req, res) => {
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.responses[200] = { description: 'Cancelled fight', schema: { $ref: '#/definitions/CancelledAuxFight' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[409] = { description: 'Fight already submitted or completed', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip =
@@ -386,14 +387,15 @@ router.patch("/:id/cancel", async (req, res) => {
         SET
           winnerfaction_id = -1,
           confirmed = 1
-        WHERE id_fight = ?
+        WHERE id_fight = ? AND confirmed = 0 AND winnerfaction_id IS NULL
       `,
       [fightId]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({
-        message: "Auxfight not found",
+      const fights = await db.pool.query("SELECT id_fight FROM aux_fights WHERE id_fight = ?", [fightId]);
+      return res.status(fights.length ? 409 : 404).json({
+        message: fights.length ? "Auxfight already submitted or completed" : "Auxfight not found",
       });
     }
 
@@ -421,41 +423,85 @@ router.patch("/:id/cancel", async (req, res) => {
 router.patch("/:id/confirmed", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
-    #swagger.summary = 'Set auxiliary-fight confirmation status'
+    #swagger.summary = 'Confirm an auxiliary fight and award PCP exactly once'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/ConfirmationUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated confirmation status', schema: { $ref: '#/definitions/ConfirmationUpdate' } }
     #swagger.responses[400] = { description: 'Invalid confirmation status', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[409] = { description: 'Fight not ready to confirm or score row unavailable', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip =
     req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
-  const fightId = req.params.id;
+  const fightId = Number(req.params.id);
   const { confirmed } = req.body || {};
+  let connection;
+  let committed = false;
 
   try {
+    if (!Number.isSafeInteger(fightId) || fightId <= 0) {
+      return res.status(400).json({ message: "id must be a positive integer" });
+    }
     if (confirmed !== 0 && confirmed !== 1) {
       return res.status(400).json({
         message: "confirmed must be either 0 or 1",
       });
     }
 
-    const result = await db.pool.query(
-      `
-        UPDATE aux_fights
-        SET confirmed = ?
-        WHERE id_fight = ?
-      `,
-      [confirmed, fightId]
+    connection = await db.pool.getConnection();
+    await connection.beginTransaction();
+    const fights = await connection.query(
+      "SELECT confirmed, winnerfaction_id, c3_attack_id FROM aux_fights WHERE id_fight = ? FOR UPDATE",
+      [fightId]
     );
 
-    if (result.affectedRows === 0) {
+    if (!fights.length) {
       return res.status(404).json({
         message: "Auxfight not found",
       });
     }
+    const fight = fights[0];
+    if (Number(fight.confirmed) !== 0) {
+      if (confirmed === 1 && Number(fight.confirmed) === 1 && Number(fight.winnerfaction_id) > 0) {
+        return res.status(200).json({ id_fight: fightId, confirmed: 1 });
+      }
+      return res.status(409).json({ message: "Auxfight already completed" });
+    }
+    if (confirmed === 0) {
+      await connection.commit();
+      committed = true;
+      return res.status(200).json({ id_fight: fightId, confirmed: 0 });
+    }
+    if (!Number.isSafeInteger(Number(fight.winnerfaction_id)) || Number(fight.winnerfaction_id) <= 0 ||
+        !Number.isSafeInteger(Number(fight.c3_attack_id)) || Number(fight.c3_attack_id) <= 0) {
+      return res.status(409).json({ message: "Winner and planet fight must be submitted first" });
+    }
+
+    const references = await connection.query(
+      "SELECT `Value` FROM c3_SCORE_REFERENCE WHERE `Key` = ?",
+      ["PCP_AUX"]
+    );
+    if (references.length !== 1 || references[0].Value === null ||
+        String(references[0].Value).trim() === "" ||
+        !Number.isFinite(Number(references[0].Value))) {
+      return res.status(409).json({ message: "PCP_AUX reference is missing or invalid" });
+    }
+    const scores = await connection.query(
+      "SELECT FactionID, AttackID FROM c3_SCORE WHERE FactionID = ? AND AttackID = ? FOR UPDATE",
+      [fight.winnerfaction_id, fight.c3_attack_id]
+    );
+    if (scores.length !== 1) {
+      return res.status(409).json({ message: "Expected exactly one score row for winner and attack" });
+    }
+    await connection.query(
+      "UPDATE c3_SCORE SET PCP = COALESCE(PCP, 0) + ? WHERE FactionID = ? AND AttackID = ?",
+      [references[0].Value, fight.winnerfaction_id, fight.c3_attack_id]
+    );
+    await connection.query("UPDATE aux_fights SET confirmed = 1 WHERE id_fight = ?", [fightId]);
+    await connection.commit();
+    committed = true;
 
     logger.info(
       `Confirmed for auxfight ${fightId} updated to ${confirmed} from ip: ${ip}`
@@ -471,49 +517,82 @@ router.patch("/:id/confirmed", async (req, res) => {
     );
 
     return res.status(500).json({
-      message: err.message,
+      message: "Server error",
     });
+  } finally {
+    if (connection) {
+      if (!committed) {
+        try { await connection.rollback(); }
+        catch (err) { logger.error("Failed to rollback confirmation: " + err.message); }
+      }
+      connection.release();
+    }
   }
 });
 
 router.patch("/:id/winner", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
-    #swagger.summary = 'Set the winning faction of an auxiliary fight'
+    #swagger.summary = 'Submit the winning faction and planet fight (no PCP awarded yet)'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/WinnerUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated winning faction', schema: { $ref: '#/definitions/WinnerUpdate' } }
     #swagger.responses[400] = { description: 'Invalid winner faction', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[409] = { description: 'Fight already submitted or completed', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip =
     req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
-  const fightId = req.params.id;
-  const { winnerfaction_id } = req.body || {};
+  const fightId = Number(req.params.id);
+  const { winnerfaction_id, c3_attack_id } = req.body || {};
+  let connection;
+  let committed = false;
 
   try {
-    if (!Number.isInteger(winnerfaction_id)) {
+    if (!Number.isSafeInteger(fightId) || fightId <= 0 ||
+        !Number.isSafeInteger(winnerfaction_id) || winnerfaction_id <= 0 ||
+        !Number.isSafeInteger(c3_attack_id) || c3_attack_id <= 0) {
       return res.status(400).json({
-        message: "winnerfaction_id must be an integer",
+        message: "id, winnerfaction_id and c3_attack_id must be positive integers",
       });
     }
 
-    const result = await db.pool.query(
-      `
-        UPDATE aux_fights
-        SET winnerfaction_id = ?
-        WHERE id_fight = ?
-      `,
-      [winnerfaction_id, fightId]
+    connection = await db.pool.getConnection();
+    await connection.beginTransaction();
+    const fights = await connection.query(
+      "SELECT confirmed, winnerfaction_id, c3_attack_id FROM aux_fights WHERE id_fight = ? FOR UPDATE",
+      [fightId]
     );
 
-    if (result.affectedRows === 0) {
+    if (!fights.length) {
       return res.status(404).json({
         message: "Auxfight not found",
       });
     }
+    const fight = fights[0];
+    if (Number(fight.confirmed) !== 0 || fight.winnerfaction_id !== null) {
+      if (Number(fight.confirmed) === 0 && Number(fight.winnerfaction_id) === winnerfaction_id &&
+          Number(fight.c3_attack_id) === c3_attack_id) {
+        return res.status(200).json({ id_fight: fightId, winnerfaction_id, c3_attack_id });
+      }
+      return res.status(409).json({ message: "Auxfight already submitted or completed" });
+    }
+    const attacks = await connection.query("SELECT ID FROM c3_ATTACK WHERE ID = ?", [c3_attack_id]);
+    const participants = await connection.query(
+      "SELECT faction_id FROM aux_fightusers WHERE fight_id = ? AND faction_id = ?",
+      [fightId, winnerfaction_id]
+    );
+    if (!attacks.length || !participants.length) {
+      return res.status(400).json({ message: "Unknown attack or winner faction does not participate in this fight" });
+    }
+    await connection.query(
+      "UPDATE aux_fights SET winnerfaction_id = ?, c3_attack_id = ? WHERE id_fight = ?",
+      [winnerfaction_id, c3_attack_id, fightId]
+    );
+    await connection.commit();
+    committed = true;
 
     logger.info(
       `Winner faction for auxfight ${fightId} updated to ${winnerfaction_id} from ip: ${ip}`
@@ -522,6 +601,7 @@ router.patch("/:id/winner", async (req, res) => {
     return res.status(200).json({
       id_fight: fightId,
       winnerfaction_id,
+      c3_attack_id,
     });
   } catch (err) {
     logger.error(
@@ -529,8 +609,16 @@ router.patch("/:id/winner", async (req, res) => {
     );
 
     return res.status(500).json({
-      message: err.message,
+      message: "Server error",
     });
+  } finally {
+    if (connection) {
+      if (!committed) {
+        try { await connection.rollback(); }
+        catch (err) { logger.error("Failed to rollback result submission: " + err.message); }
+      }
+      connection.release();
+    }
   }
 });
 
