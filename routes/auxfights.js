@@ -372,7 +372,7 @@ router.patch("/:id/cancel", async (req, res) => {
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.responses[200] = { description: 'Cancelled fight', schema: { $ref: '#/definitions/CancelledAuxFight' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
-    #swagger.responses[409] = { description: 'Fight already submitted or completed', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[409] = { description: 'Fight already completed', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
   */
   const ip =
@@ -387,7 +387,7 @@ router.patch("/:id/cancel", async (req, res) => {
         SET
           winnerfaction_id = -1,
           confirmed = 1
-        WHERE id_fight = ? AND confirmed = 0 AND winnerfaction_id IS NULL
+        WHERE id_fight = ? AND confirmed = 0
       `,
       [fightId]
     );
@@ -395,7 +395,7 @@ router.patch("/:id/cancel", async (req, res) => {
     if (result.affectedRows === 0) {
       const fights = await db.pool.query("SELECT id_fight FROM aux_fights WHERE id_fight = ?", [fightId]);
       return res.status(fights.length ? 409 : 404).json({
-        message: fights.length ? "Auxfight already submitted or completed" : "Auxfight not found",
+        message: fights.length ? "Auxfight already completed" : "Auxfight not found",
       });
     }
 
@@ -423,7 +423,7 @@ router.patch("/:id/cancel", async (req, res) => {
 router.patch("/:id/confirmed", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
-    #swagger.summary = 'Confirm an auxiliary fight and create or update its PCP score exactly once'
+    #swagger.summary = 'Confirm an auxiliary fight and create or update its PCP score exactly once, or reject the submitted result'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/ConfirmationUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated confirmation status', schema: { $ref: '#/definitions/ConfirmationUpdate' } }
@@ -472,6 +472,12 @@ router.patch("/:id/confirmed", async (req, res) => {
       return res.status(409).json({ message: "Auxfight already completed" });
     }
     if (confirmed === 0) {
+      // Rejection reopens the match for the creator to submit a corrected result.
+      // No PCP score has been awarded while the fight is unconfirmed.
+      await connection.query(
+        "UPDATE aux_fights SET winnerfaction_id = NULL, c3_attack_id = NULL WHERE id_fight = ?",
+        [fightId]
+      );
       await connection.commit();
       committed = true;
       return res.status(200).json({ id_fight: fightId, confirmed: 0 });
