@@ -524,7 +524,10 @@ router.patch("/:id/confirmed", async (req, res) => {
       "INSERT INTO c3_SCORE (SeasonId, AttackID, FactionID, PCP) VALUES (?, ?, ?, ?)",
       [seasonId, fight.c3_attack_id, fight.winnerfaction_id, pcpAward]
     );
-    await connection.query("UPDATE aux_fights SET confirmed = 1 WHERE id_fight = ?", [fightId]);
+    await connection.query(
+      "UPDATE aux_fights SET confirmed = 1 WHERE id_fight = ?",
+      [fightId]
+    );
     await connection.commit();
     committed = true;
 

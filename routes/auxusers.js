@@ -38,6 +38,58 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/highscore", async (req, res) => {
+  /*
+    #swagger.tags = ['Auxiliary users']
+    #swagger.summary = 'All-time PCP ranking of all auxiliary users'
+    #swagger.description = 'Only the initiator (fightcreator = 1) receives PCP when their faction wins. PCP are calculated live as current PCP_AUX times fight_teamsize across all seasons. Only confirmed fights with a positive winner count as played for every participant. Equal PCP totals share a rank.'
+    #swagger.responses[200] = { description: 'Ranked users', schema: [{ rank: 1, id_user: 12, username: 'Player', fights: 3, pcp: 20 }] }
+    #swagger.responses[500] = { description: 'Database error or invalid PCP reference' }
+  */
+  try {
+    const references = await db.pool.query(
+      "SELECT `Value` FROM c3_SCORE_REFERENCE WHERE `Key` = ?", ["PCP_AUX"]
+    );
+    if (references.length !== 1 || references[0].Value === null ||
+        String(references[0].Value).trim() === "" ||
+        !Number.isFinite(Number(references[0].Value))) {
+      throw new Error("PCP_AUX reference is missing or invalid");
+    }
+    const rows = await db.pool.query(`
+      SELECT u.id_user, u.username,
+             COUNT(completed.id_fight) AS fights,
+             COALESCE(SUM(CASE WHEN completed.won = 1
+                         THEN ? * completed.team_size ELSE 0 END), 0) AS pcp
+      FROM aux_users u
+      LEFT JOIN (
+        SELECT fu.user_id, f.id_fight,
+               CASE WHEN f.fight_teamsize > 0 THEN f.fight_teamsize ELSE 1 END AS team_size,
+               MAX(CASE WHEN fu.fightcreator = 1 AND fu.faction_id = f.winnerfaction_id
+                        THEN 1 ELSE 0 END) AS won
+        FROM aux_fightusers fu
+        INNER JOIN aux_fights f ON f.id_fight = fu.fight_id
+        WHERE f.confirmed = 1 AND f.winnerfaction_id > 0
+        GROUP BY fu.user_id, f.id_fight, f.fight_teamsize
+      ) completed ON completed.user_id = u.id_user
+      GROUP BY u.id_user, u.username
+      ORDER BY pcp DESC, u.username ASC, u.id_user ASC
+    `, [Number(references[0].Value)]);
+    let rank = 0;
+    let previousPcp;
+    const highscore = rows.map((row, index) => {
+      const pcp = Number(row.pcp);
+      if (!Number.isFinite(pcp)) throw new Error("Invalid highscore PCP total");
+      if (index === 0 || pcp !== previousPcp) rank = index + 1;
+      previousPcp = pcp;
+      return { rank, id_user: Number(row.id_user), username: row.username, fights: Number(row.fights), pcp };
+    });
+    return res.status(200).json(highscore);
+  } catch (err) {
+    logger.error("Failed to load auxiliary highscore: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
