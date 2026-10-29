@@ -7,6 +7,7 @@ const router = express.Router();
 
 const TABLE_NAME = "aux_fights";
 const PRIMARY_KEY_COLUMN = "id_fight";
+const UNASSIGNED_ATTACK_SEASON_ID = 1;
 
 function serializeInsertResult(result) {
   return {
@@ -433,6 +434,7 @@ router.patch("/:id/confirmed", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
     #swagger.summary = 'Confirm an auxiliary fight and insert its own PCP score row exactly once, or reject the submitted result'
+    #swagger.description = 'Without a planet assignment (c3_attack_id = 0), PCP are recorded with AttackID 0 and fixed SeasonId 1. Assigned attacks use their own season.'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/ConfirmationUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated confirmation status', schema: { $ref: '#/definitions/ConfirmationUpdate' } }
@@ -490,8 +492,9 @@ router.patch("/:id/confirmed", async (req, res) => {
       return res.status(200).json({ id_fight: fightId, confirmed: 0 });
     }
     if (!Number.isSafeInteger(Number(fight.winnerfaction_id)) || Number(fight.winnerfaction_id) <= 0 ||
-        !Number.isSafeInteger(Number(fight.c3_attack_id)) || Number(fight.c3_attack_id) <= 0) {
-      return res.status(409).json({ message: "Winner and planet fight must be submitted first" });
+        fight.c3_attack_id === null ||
+        !Number.isSafeInteger(Number(fight.c3_attack_id)) || Number(fight.c3_attack_id) < 0) {
+      return res.status(409).json({ message: "Winner and planet fight ID (0 for no assignment) must be submitted first" });
     }
 
     const references = await connection.query(
@@ -508,13 +511,16 @@ router.patch("/:id/confirmed", async (req, res) => {
     if (!Number.isFinite(pcpAward)) {
       return res.status(409).json({ message: "Calculated PCP award is invalid" });
     }
-    const attacks = await connection.query(
-      "SELECT Season FROM c3_ATTACK WHERE ID = ?",
-      [fight.c3_attack_id]
-    );
-    const seasonId = Number(attacks[0]?.Season);
-    if (attacks.length !== 1 || !Number.isSafeInteger(seasonId) || seasonId <= 0) {
-      return res.status(409).json({ message: "Planet fight has no valid season" });
+    let seasonId = UNASSIGNED_ATTACK_SEASON_ID;
+    if (Number(fight.c3_attack_id) > 0) {
+      const attacks = await connection.query(
+        "SELECT Season FROM c3_ATTACK WHERE ID = ?",
+        [fight.c3_attack_id]
+      );
+      seasonId = Number(attacks[0]?.Season);
+      if (attacks.length !== 1 || !Number.isSafeInteger(seasonId) || seasonId <= 0) {
+        return res.status(409).json({ message: "Planet fight has no valid season" });
+      }
     }
 
     // Each confirmed aux fight gets a separate award, even for the same
@@ -561,11 +567,11 @@ router.patch("/:id/confirmed", async (req, res) => {
 router.patch("/:id/winner", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
-    #swagger.summary = 'Submit the winning faction and planet fight (no PCP awarded yet)'
+    #swagger.summary = 'Submit the winning faction and planet fight ID (0 for no assignment; no PCP awarded yet)'
     #swagger.parameters['id'] = { description: 'Fight ID', required: true, type: 'integer' }
     #swagger.parameters['body'] = { in: 'body', required: true, schema: { $ref: '#/definitions/WinnerUpdateRequest' } }
     #swagger.responses[200] = { description: 'Updated winning faction', schema: { $ref: '#/definitions/WinnerUpdate' } }
-    #swagger.responses[400] = { description: 'Invalid winner faction', schema: { $ref: '#/definitions/Error' } }
+    #swagger.responses[400] = { description: 'Invalid winner faction or attack ID', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[404] = { description: 'Fight not found', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[409] = { description: 'Fight already submitted or completed', schema: { $ref: '#/definitions/Error' } }
     #swagger.responses[500] = { description: 'Database error', schema: { $ref: '#/definitions/Error' } }
@@ -581,9 +587,9 @@ router.patch("/:id/winner", async (req, res) => {
   try {
     if (!Number.isSafeInteger(fightId) || fightId <= 0 ||
         !Number.isSafeInteger(winnerfaction_id) || winnerfaction_id <= 0 ||
-        !Number.isSafeInteger(c3_attack_id) || c3_attack_id <= 0) {
+        !Number.isSafeInteger(c3_attack_id) || c3_attack_id < 0) {
       return res.status(400).json({
-        message: "id, winnerfaction_id and c3_attack_id must be positive integers",
+        message: "id and winnerfaction_id must be positive integers; c3_attack_id must be a non-negative integer (0 for no assignment)",
       });
     }
 
@@ -607,12 +613,17 @@ router.patch("/:id/winner", async (req, res) => {
       }
       return res.status(409).json({ message: "Auxfight already submitted or completed" });
     }
-    const attacks = await connection.query("SELECT ID FROM c3_ATTACK WHERE ID = ?", [c3_attack_id]);
+    if (c3_attack_id > 0) {
+      const attacks = await connection.query("SELECT ID FROM c3_ATTACK WHERE ID = ?", [c3_attack_id]);
+      if (!attacks.length) {
+        return res.status(400).json({ message: "Unknown attack or winner faction does not participate in this fight" });
+      }
+    }
     const participants = await connection.query(
       "SELECT faction_id FROM aux_fightusers WHERE fight_id = ? AND faction_id = ?",
       [fightId, winnerfaction_id]
     );
-    if (!attacks.length || !participants.length) {
+    if (!participants.length) {
       return res.status(400).json({ message: "Unknown attack or winner faction does not participate in this fight" });
     }
     await connection.query(

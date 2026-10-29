@@ -597,7 +597,7 @@
           "Auxiliary fights"
         ],
         "summary": "Confirm an auxiliary fight and insert its own PCP score row exactly once, or reject the submitted result",
-        "description": "",
+        "description": "Without a planet assignment (c3_attack_id = 0), PCP are recorded with AttackID 0 and fixed SeasonId 1. Assigned attacks use their own season.",
         "parameters": [
           {
             "name": "id",
@@ -659,7 +659,7 @@
         "tags": [
           "Auxiliary fights"
         ],
-        "summary": "Submit the winning faction and planet fight (no PCP awarded yet)",
+        "summary": "Submit the winning faction and planet fight ID (0 for no assignment; no PCP awarded yet)",
         "description": "",
         "parameters": [
           {
@@ -691,7 +691,7 @@
             }
           },
           "400": {
-            "description": "Invalid winner faction",
+            "description": "Invalid winner faction or attack ID",
             "schema": {
               "$ref": "#/definitions/Error"
             }
@@ -1232,9 +1232,17 @@
                   "type": "boolean",
                   "example": true
                 },
+                "minimum": {
+                  "type": "number",
+                  "example": 0
+                },
                 "example": {
                   "type": "number",
                   "example": 15
+                },
+                "description": {
+                  "type": "string",
+                  "example": "0 means no planet assignment; confirmation awards PCP in season 1. NULL means no result submitted."
                 }
               }
             },
@@ -1977,9 +1985,17 @@
                   "type": "string",
                   "example": "integer"
                 },
+                "minimum": {
+                  "type": "number",
+                  "example": 0
+                },
                 "example": {
                   "type": "number",
                   "example": 15
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Use 0 for no planet assignment; confirmation awards PCP with AttackID 0 and SeasonId 1."
                 }
               }
             }
@@ -2030,9 +2046,17 @@
                   "type": "string",
                   "example": "integer"
                 },
+                "minimum": {
+                  "type": "number",
+                  "example": 0
+                },
                 "example": {
                   "type": "number",
                   "example": 15
+                },
+                "description": {
+                  "type": "string",
+                  "example": "0 means no planet assignment; confirmation awards PCP in season 1."
                 }
               }
             }

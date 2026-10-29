@@ -23,7 +23,7 @@ const doc = {
         fight_teamsize: { type: 'integer', minimum: 1, maximum: 2147483647, default: 1, example: 3, description: 'Player count used as the PCP_AUX multiplier.' },
         confirmed: { type: 'integer', enum: [0, 1], example: 0 },
         campaign_id: { type: 'integer', nullable: true, example: 7 },
-        c3_attack_id: { type: 'integer', nullable: true, example: 15 },
+        c3_attack_id: { type: 'integer', nullable: true, minimum: 0, example: 15, description: '0 means no planet assignment; confirmation awards PCP in season 1. NULL means no result submitted.' },
         winnerfaction_id: { type: 'integer', nullable: true, example: 3 },
         fightcreator: { type: 'integer', example: 1 },
         updated: { type: 'string', example: '2026-09-09T12:00:00.000Z' },
@@ -130,7 +130,7 @@ const doc = {
       required: ['winnerfaction_id', 'c3_attack_id'],
       properties: {
         winnerfaction_id: { type: 'integer', example: 3 },
-        c3_attack_id: { type: 'integer', example: 15 },
+        c3_attack_id: { type: 'integer', minimum: 0, example: 15, description: 'Use 0 for no planet assignment; confirmation awards PCP with AttackID 0 and SeasonId 1.' },
       },
     },
     WinnerUpdate: {
@@ -138,7 +138,7 @@ const doc = {
       properties: {
         id_fight: { type: 'string', example: '42' },
         winnerfaction_id: { type: 'integer', example: 3 },
-        c3_attack_id: { type: 'integer', example: 15 },
+        c3_attack_id: { type: 'integer', minimum: 0, example: 15, description: '0 means no planet assignment; confirmation awards PCP in season 1.' },
       },
     },
     AuxCampaignFaction: {

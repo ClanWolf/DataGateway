@@ -18,7 +18,11 @@ Fight responses include the team size; legacy missing/invalid values read as 1.
 On the first successful confirmation, the awarded PCP are
 `PCP_AUX × fight_teamsize`. Each confirmed fight inserts a new `c3_SCORE` row:
 `FactionID` is the winning faction, `AttackID` is the selected `c3_attack_id`,
-and `SeasonId` comes from that attack. Existing score rows are never updated,
+and `SeasonId` comes from that attack. `PATCH /auxfights/:id/winner` also accepts
+explicit integer `c3_attack_id: 0` for no planet assignment. In that case,
+confirmation awards the same PCP with `AttackID = 0` and fixed `SeasonId = 1`,
+without looking up an attack. Missing, NULL, negative, fractional and string
+attack IDs are rejected on submission. Existing score rows are never updated,
 even when multiple rows already share this faction/attack/season combination.
 `GET /score` continues to return the sum of all matching rows. Repeated
 confirmations of the same fight do not award again; insertion and confirmation
