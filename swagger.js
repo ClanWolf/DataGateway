@@ -12,7 +12,7 @@ const doc = {
   },
   // host: 'localhost:3000',
   host: 'dg.clanwolf.net',
-  schemes: 'https',
+  schemes: ['https'],
   basePath: '/',
   definitions: {
     AuxFight: {

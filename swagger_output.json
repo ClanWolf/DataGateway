@@ -8,7 +8,9 @@
   },
   "host": "dg.clanwolf.net",
   "basePath": "/",
-  "schemes": "https",
+  "schemes": [
+    "https"
+  ],
   "paths": {
     "/login/": {
       "post": {
@@ -402,19 +404,45 @@
           "Auxiliary fights"
         ],
         "summary": "List auxiliary fights",
-        "description": "",
+        "description": "Without parameters: all fights. Set count=true for the number of completed fights. Set factions=true for wins per faction. Set both to true for faction wins plus the total count. Only confirmed fights with a positive winner count in statistics; c3_attack_id=0 is included. Factions without wins are omitted.",
         "parameters": [
           {
             "name": "x-forwarded-for",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "Return only the count of confirmed fights with a positive winner, including fights without a planet assignment.",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          },
+          {
+            "name": "factions",
+            "in": "query",
+            "description": "Return { factions: [{ faction_id, name_de, name_en, wins }] } for factions with confirmed wins, ordered by wins descending. Combine with count=true to include the total count.",
+            "required": false,
+            "type": "boolean",
+            "default": false
           }
         ],
         "responses": {
           "200": {
-            "description": "Auxiliary fights",
-            "schema": {
-              "$ref": "#/definitions/AuxFightList"
+            "description": "An array of fights by default; { count: integer } with count=true; { factions: [...] } with factions=true; { count: integer, factions: [...] } with both true.",
+            "examples": {
+              "application/json": {
+                "count": 3,
+                "factions": [
+                  {
+                    "faction_id": 3,
+                    "name_de": "Clan Wolf",
+                    "name_en": "Clan Wolf",
+                    "wins": 3
+                  }
+                ]
+              }
             }
           },
           "500": {
@@ -849,7 +877,7 @@
           "Auxiliary users"
         ],
         "summary": "All-time PCP ranking of all auxiliary users",
-        "description": "Only the initiator (fightcreator = 1) receives PCP when their faction wins. PCP are calculated live as current PCP_AUX times fight_teamsize across all seasons. Only confirmed fights with a positive winner count as played for every participant. Equal PCP totals share a rank.",
+        "description": "Every participant of the winning faction receives PCP, regardless of fightcreator or planet assignment (including c3_attack_id = 0). PCP are calculated live as current PCP_AUX times fight_teamsize across all seasons. Only confirmed fights with a positive winner count as played for every participant. Equal PCP totals share a rank.",
         "responses": {
           "200": {
             "description": "Ranked users",
@@ -886,7 +914,7 @@
             }
           },
           "500": {
-            "description": "Database error"
+            "description": "Database error or invalid PCP reference"
           }
         }
       }

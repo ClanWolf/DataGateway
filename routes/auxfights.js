@@ -28,12 +28,39 @@ router.get("/", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
     #swagger.summary = 'List auxiliary fights'
+    #swagger.description = 'Without parameters: all fights. Set count=true for the number of completed fights. Set factions=true for wins per faction. Set both to true for faction wins plus the total count. Only confirmed fights with a positive winner count in statistics; c3_attack_id=0 is included. Factions without wins are omitted.'
     #swagger.parameters['count'] = { in: 'query', description: 'Return only the count of confirmed fights with a positive winner, including fights without a planet assignment.', required: false, type: 'boolean', default: false }
-    #swagger.responses[200] = { description: 'Auxiliary fights, or { count: integer } when count=true' }
+    #swagger.parameters['factions'] = { in: 'query', description: 'Return { factions: [{ faction_id, name_de, name_en, wins }] } for factions with confirmed wins, ordered by wins descending. Combine with count=true to include the total count.', required: false, type: 'boolean', default: false }
+    #swagger.responses[200] = { description: 'An array of fights by default; { count: integer } with count=true; { factions: [...] } with factions=true; { count: integer, factions: [...] } with both true.', examples: { 'application/json': { count: 3, factions: [{ faction_id: 3, name_de: 'Clan Wolf', name_en: 'Clan Wolf', wins: 3 }] } } }
   */
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
+    if (req.query.factions === "true") {
+      const rows = await db.pool.query(`
+        SELECT f.winnerfaction_id AS faction_id,
+               c.Name_de AS name_de, c.Name_en AS name_en,
+               COUNT(*) AS wins
+        FROM ${TABLE_NAME} f
+        LEFT JOIN c3_FACTION c ON c.ID = f.winnerfaction_id
+        WHERE f.confirmed = 1 AND f.winnerfaction_id > 0
+        GROUP BY f.winnerfaction_id, c.Name_de, c.Name_en
+        ORDER BY wins DESC, f.winnerfaction_id ASC
+      `);
+      const factions = rows.map((row) => ({
+        faction_id: Number(row.faction_id),
+        name_de: row.name_de,
+        name_en: row.name_en,
+        wins: Number(row.wins),
+      }));
+      const result = { factions };
+      if (req.query.count === "true") {
+        result.count = factions.reduce((total, faction) => total + faction.wins, 0);
+      }
+      logger.info("Auxfight faction wins requested from ip: " + ip);
+      return res.status(200).json(result);
+    }
+
     if (req.query.count === "true") {
       const rows = await db.pool.query(
         `SELECT COUNT(*) AS count FROM ${TABLE_NAME} WHERE confirmed = 1 AND winnerfaction_id > 0`
