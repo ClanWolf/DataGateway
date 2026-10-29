@@ -28,11 +28,20 @@ router.get("/", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary fights']
     #swagger.summary = 'List auxiliary fights'
-    #swagger.responses[200] = { description: 'Auxiliary fights', schema: { $ref: '#/definitions/AuxFightList' } }
+    #swagger.parameters['count'] = { in: 'query', description: 'Return only the count of confirmed fights with a positive winner, including fights without a planet assignment.', required: false, type: 'boolean', default: false }
+    #swagger.responses[200] = { description: 'Auxiliary fights, or { count: integer } when count=true' }
   */
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
 
   try {
+    if (req.query.count === "true") {
+      const rows = await db.pool.query(
+        `SELECT COUNT(*) AS count FROM ${TABLE_NAME} WHERE confirmed = 1 AND winnerfaction_id > 0`
+      );
+      logger.info("Auxfight count requested from ip: " + ip);
+      return res.status(200).json({ count: Number(rows[0].count) });
+    }
+
     const fights = await db.pool.query(`SELECT * FROM ${TABLE_NAME}`);
     const auxFights = fights.map((fight) => new AuxFight(fight));
     logger.info("List of all auxfight records requested from ip: " + ip);
