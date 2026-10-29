@@ -45,9 +45,9 @@ highscore columns or migration are needed. Deploy this API before the frontend.
 `GET /auxusers/highscore` is public and returns all users, including users without
 fights, as an array of `{ rank, id_user, username, fights, pcp }` across all seasons.
 Only confirmed fights with a positive winner count as played for every
-participant, including losses. Only the initiator marked by
-`aux_fightusers.fightcreator = 1` receives the **full** fight PCP when their
-faction wins. Winning teammates and opponents receive zero. Duplicate memberships
+participant, including losses. Every participant whose faction wins receives the
+**full** fight PCP, regardless of `aux_fightusers.fightcreator` or planet
+assignment (including `c3_attack_id = 0`). Losing participants receive zero. Duplicate memberships
 count once per user/fight. Totals descend by PCP; equal totals share a competition
 rank (1, 1, 3), with names and user IDs breaking display ties.
 

@@ -35,7 +35,7 @@ async function serve(t, router) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-test('live aggregation credits only winning initiators and deduplicates all completed participations', async (t) => {
+test('live aggregation credits all winners and deduplicates all completed participations', async (t) => {
   // SQLite executes the portable SELECT used by MariaDB, rather than returning
   // pre-aggregated mocks that could hide JOIN/SUM mistakes.
   const db = new DatabaseSync(':memory:');
@@ -66,19 +66,49 @@ test('live aggregation credits only winning initiators and deduplicates all comp
   assert.deepEqual(entries.map(({ id_user, rank, fights, pcp }) =>
     [id_user, rank, fights, pcp]), [
     [1, 1, 3, 30],
-    [2, 2, 2, 10],
-    [5, 2, 1, 10],
-    [6, 2, 2, 10],
-    [3, 5, 3, 0],
-    [4, 5, 0, 0],
+    [2, 1, 2, 30],
+    [6, 1, 2, 30],
+    [5, 4, 1, 10],
+    [3, 4, 3, 10],
+    [4, 6, 0, 0],
   ]);
   assert.ok(entries.every((entry) => !('missing_pcp_fights' in entry)));
   db.exec("UPDATE c3_SCORE_REFERENCE SET Value = 2.5 WHERE `Key` = 'PCP_AUX'");
   const updated = await (await fetch(`${url}/highscore`)).json();
-  assert.deepEqual(updated.map((entry) => entry.pcp), [7.5, 2.5, 2.5, 2.5, 0, 0]);
+  assert.deepEqual(updated.map((entry) => entry.pcp), [7.5, 7.5, 7.5, 2.5, 2.5, 0]);
   db.exec("UPDATE c3_SCORE_REFERENCE SET Value = 0 WHERE `Key` = 'PCP_AUX'");
   const zero = await (await fetch(`${url}/highscore`)).json();
   assert.ok(zero.every((entry) => entry.pcp === 0 && entry.rank === 1));
+});
+
+test('three wins as opponent with attack ID zero award three PCP', async (t) => {
+  const db = new DatabaseSync(':memory:');
+  t.after(() => db.close());
+  db.exec(`
+    CREATE TABLE aux_users (id_user INTEGER, username TEXT);
+    CREATE TABLE aux_fights (
+      id_fight INTEGER, confirmed INTEGER, winnerfaction_id INTEGER,
+      fight_teamsize INTEGER, c3_attack_id INTEGER
+    );
+    CREATE TABLE aux_fightusers (user_id INTEGER, fight_id INTEGER, faction_id INTEGER, fightcreator INTEGER);
+    CREATE TABLE c3_SCORE_REFERENCE ("Key" TEXT, "Value" DOUBLE);
+    INSERT INTO c3_SCORE_REFERENCE VALUES ('PCP_AUX', 1);
+    INSERT INTO aux_users VALUES (1, 'Initiator'), (2, 'Winner');
+    INSERT INTO aux_fights VALUES (1, 1, 20, 1, 0), (2, 1, 20, 1, 0), (3, 1, 20, 1, 0);
+    INSERT INTO aux_fightusers VALUES
+      (1, 1, 10, 1), (2, 1, 20, 0),
+      (1, 2, 10, 1), (2, 2, 20, 0),
+      (1, 3, 10, 1), (2, 3, 20, 0);
+  `);
+  const url = await serve(t, loadRouter('auxusers.js', {
+    query: async (sql, args) => db.prepare(sql).all(...args),
+  }));
+  const response = await fetch(`${url}/highscore`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), [
+    { rank: 1, id_user: 2, username: 'Winner', fights: 3, pcp: 3 },
+    { rank: 2, id_user: 1, username: 'Initiator', fights: 3, pcp: 0 },
+  ]);
 });
 
 test('empty user list and database failures have explicit responses', async (t) => {

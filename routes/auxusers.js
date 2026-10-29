@@ -42,7 +42,7 @@ router.get("/highscore", async (req, res) => {
   /*
     #swagger.tags = ['Auxiliary users']
     #swagger.summary = 'All-time PCP ranking of all auxiliary users'
-    #swagger.description = 'Only the initiator (fightcreator = 1) receives PCP when their faction wins. PCP are calculated live as current PCP_AUX times fight_teamsize across all seasons. Only confirmed fights with a positive winner count as played for every participant. Equal PCP totals share a rank.'
+    #swagger.description = 'Every participant of the winning faction receives PCP, regardless of fightcreator or planet assignment (including c3_attack_id = 0). PCP are calculated live as current PCP_AUX times fight_teamsize across all seasons. Only confirmed fights with a positive winner count as played for every participant. Equal PCP totals share a rank.'
     #swagger.responses[200] = { description: 'Ranked users', schema: [{ rank: 1, id_user: 12, username: 'Player', fights: 3, pcp: 20 }] }
     #swagger.responses[500] = { description: 'Database error or invalid PCP reference' }
   */
@@ -64,7 +64,7 @@ router.get("/highscore", async (req, res) => {
       LEFT JOIN (
         SELECT fu.user_id, f.id_fight,
                CASE WHEN f.fight_teamsize > 0 THEN f.fight_teamsize ELSE 1 END AS team_size,
-               MAX(CASE WHEN fu.fightcreator = 1 AND fu.faction_id = f.winnerfaction_id
+               MAX(CASE WHEN fu.faction_id = f.winnerfaction_id
                         THEN 1 ELSE 0 END) AS won
         FROM aux_fightusers fu
         INNER JOIN aux_fights f ON f.id_fight = fu.fight_id
