@@ -62,6 +62,24 @@ MariaDB. No production database connection or credentials are used by the tests.
 
 ## Auxiliary highscore
 
+`GET /auxfights?count=true&factions=true&pcp=true` adds `pcp` to each faction's
+statistics for the smaller totals below the large win scoreboard. These are
+all-season **booked** `c3_SCORE.PCP` totals per positive faction ID, including
+`AttackID = 0` and factions with bookings but no auxiliary wins. Wins and PCP
+are aggregated independently so neither multiple fights nor multiple awards
+multiply totals. Player highscore points and current reference values are not
+used for these totals. Calls without `pcp=true` retain their existing response.
+
+Add `vp=true` to include `vp`, the corresponding all-season sum of booked
+`c3_SCORE.VP` per faction. The frontend requests
+`GET /auxfights?count=true&factions=true&pcp=true&vp=true` and shows these victory
+points directly beneath each faction. `vp=true` also works independently of
+`pcp=true`; unrequested fields are omitted. NULL bookings and missing bookings
+sum to zero. Factions with score entries but no auxiliary wins remain included.
+Wins, PCP and VP are aggregated without multiplying one another; player scores
+and PCP reference recalculations are not used. Deploy the API before the frontend;
+the existing `c3_SCORE.VP` column is used, so no schema migration is required.
+
 Only the existing `doc/fight-teamsize.sql` migration is required. No additional
 highscore columns or migration are needed. Deploy this API before the frontend.
 

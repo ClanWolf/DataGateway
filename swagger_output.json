@@ -426,6 +426,22 @@
             "required": false,
             "type": "boolean",
             "default": false
+          },
+          {
+            "name": "pcp",
+            "in": "query",
+            "description": "With factions=true, add pcp as the all-season sum of booked c3_SCORE.PCP per faction, including AttackID 0. Includes factions with PCP bookings but no auxiliary wins. Player highscore totals are not summed.",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          },
+          {
+            "name": "vp",
+            "in": "query",
+            "description": "With factions=true, add vp as the all-season sum of booked c3_SCORE.VP per faction, including AttackID 0. Can be combined with pcp=true. Factions without auxiliary wins are included if score bookings exist.",
+            "required": false,
+            "type": "boolean",
+            "default": false
           }
         ],
         "responses": {

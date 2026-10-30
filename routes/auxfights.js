@@ -31,6 +31,8 @@ router.get("/", async (req, res) => {
     #swagger.description = 'Without parameters: all fights. Set count=true for the number of completed fights. Set factions=true for wins per faction. Set both to true for faction wins plus the total count. Only confirmed fights with a positive winner count in statistics; c3_attack_id=0 is included. Factions without wins are omitted.'
     #swagger.parameters['count'] = { in: 'query', description: 'Return only the count of confirmed fights with a positive winner, including fights without a planet assignment.', required: false, type: 'boolean', default: false }
     #swagger.parameters['factions'] = { in: 'query', description: 'Return { factions: [{ faction_id, name_de, name_en, wins }] } for factions with confirmed wins, ordered by wins descending. Combine with count=true to include the total count.', required: false, type: 'boolean', default: false }
+    #swagger.parameters['pcp'] = { in: 'query', description: 'With factions=true, add pcp as the all-season sum of booked c3_SCORE.PCP per faction, including AttackID 0. Includes factions with PCP bookings but no auxiliary wins. Player highscore totals are not summed.', required: false, type: 'boolean', default: false }
+    #swagger.parameters['vp'] = { in: 'query', description: 'With factions=true, add vp as the all-season sum of booked c3_SCORE.VP per faction, including AttackID 0. Can be combined with pcp=true. Factions without auxiliary wins are included if score bookings exist.', required: false, type: 'boolean', default: false }
     #swagger.responses[200] = { description: 'An array of fights by default; { count: integer } with count=true; { factions: [...] } with factions=true; { count: integer, factions: [...] } with both true.', examples: { 'application/json': { count: 3, factions: [{ faction_id: 3, name_de: 'Clan Wolf', name_en: 'Clan Wolf', wins: 3 }] } } }
   */
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || null;
@@ -53,6 +55,39 @@ router.get("/", async (req, res) => {
         name_en: row.name_en,
         wins: Number(row.wins),
       }));
+      // Only these fixed, server-owned column names may enter the SELECT.
+      const metrics = [["pcp", "PCP"], ["vp", "VP"]]
+        .filter(([key]) => req.query[key] === "true");
+      if (metrics.length > 0) {
+        const scores = await db.pool.query(`
+          SELECT s.FactionID AS faction_id,
+                 c.Name_de AS name_de, c.Name_en AS name_en,
+                 ${metrics.map(([key, column]) => `COALESCE(SUM(s.${column}), 0) AS ${key}`).join(", ")}
+          FROM c3_SCORE s
+          LEFT JOIN c3_FACTION c ON c.ID = s.FactionID
+          WHERE s.FactionID > 0
+          GROUP BY s.FactionID, c.Name_de, c.Name_en
+        `);
+        const factionsById = new Map(factions.map((faction) => {
+          for (const [key] of metrics) faction[key] = 0;
+          return [faction.faction_id, faction];
+        }));
+        for (const score of scores) {
+          const id = Number(score.faction_id);
+          let faction = factionsById.get(id);
+          if (!faction) {
+            faction = { faction_id: id, name_de: score.name_de, name_en: score.name_en, wins: 0 };
+            factions.push(faction);
+            factionsById.set(id, faction);
+          }
+          for (const [key] of metrics) {
+            const total = Number(score[key]);
+            if (!Number.isFinite(total)) throw new Error(`Invalid faction ${key.toUpperCase()} total`);
+            faction[key] = total;
+          }
+        }
+        factions.sort((a, b) => b.wins - a.wins || a.faction_id - b.faction_id);
+      }
       const result = { factions };
       if (req.query.count === "true") {
         result.count = factions.reduce((total, faction) => total + faction.wins, 0);
