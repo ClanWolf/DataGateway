@@ -1074,7 +1074,7 @@
         "tags": [
           "C3 Attack"
         ],
-        "summary": "Get all attacks of a given season",
+        "summary": "Get all season attacks with winner highlighting, faction names and booked PCP",
         "description": "",
         "parameters": [
           {
@@ -1108,6 +1108,9 @@
                 "name": "main"
               }
             }
+          },
+          "400": {
+            "description": "Bad Request"
           },
           "404": {
             "description": "No attacks found for the given season",
@@ -1144,6 +1147,64 @@
     }
   },
   "definitions": {
+    "C3Attack": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number",
+          "example": 21
+        },
+        "season": {
+          "type": "number",
+          "example": 1
+        },
+        "name": {
+          "type": "string",
+          "example": "Tukayyid"
+        },
+        "round": {
+          "type": "number",
+          "example": 3
+        },
+        "winnerfaction_id": {
+          "type": "number",
+          "example": 7
+        },
+        "has_winner": {
+          "type": "boolean",
+          "example": true
+        },
+        "factions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "faction_id": {
+                "type": "number",
+                "example": 7
+              },
+              "name": {
+                "type": "object",
+                "properties": {
+                  "de": {
+                    "type": "string",
+                    "example": "Rote Garde"
+                  },
+                  "en": {
+                    "type": "string",
+                    "example": "Red Guard"
+                  }
+                }
+              },
+              "pcp": {
+                "type": "number",
+                "example": 12.5
+              }
+            }
+          }
+        }
+      }
+    },
     "AuxFight": {
       "type": "object",
       "properties": {

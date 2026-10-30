@@ -4,6 +4,29 @@
 
 Provides the API to access the database.
 
+## Planet fight selection
+
+`GET /c3attack/season/:seasonId/list` returns all attacks of the season, including
+attacks with a recorded winner, ordered by round and ID descending. Existing
+`id`, `season`, `name` and `round` fields remain. Additional fields:
+
+- `winnerfaction_id`: positive winner faction ID, otherwise `null`.
+- `has_winner`: visual status only; it does not prevent selecting an attack.
+- `factions`: `{ faction_id, name: { de, en }, pcp }` entries. Names come from
+  `c3_FACTION`; unavailable names are `null` so clients can fall back to the ID.
+
+Faction membership is collected from the attack row's `FactionID` / `FactionID_*`
+references (including the winner) and factions with score entries. Attack roles
+are read from the row rather than hard-coding undocumented role column names.
+Referenced factions without score entries have zero PCP. PCP are the sum of
+**booked** `c3_SCORE.PCP` per season, attack and faction, not the live auxiliary
+player highscore or an inferred winner. Unassigned attack-zero awards and scores
+from other seasons are excluded. The list uses at most three database queries.
+
+Invalid season IDs return 400, an empty season retains the existing 404 response.
+No schema migration is required. Deploy DataGateway before the frontend to show
+the additional details; older responses remain displayable without those details.
+
 ## Auxiliary fight team size
 
 Before deploying, run `doc/fight-teamsize.sql` against the MariaDB database.

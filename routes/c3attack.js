@@ -42,7 +42,7 @@ router.get("/season/:seasonId/list", async (req, res) => {
 
   /*
   #swagger.tags = ['C3 Attack']
-  #swagger.summary = 'Get all attacks of a given season'
+  #swagger.summary = 'Get all season attacks with winner highlighting, faction names and booked PCP'
   #swagger.parameters['seasonId'] = { description: 'ID of the given season', required: true, type: 'integer' }
   #swagger.responses[200] = {
     description: 'List of attacks for the given season',
@@ -70,19 +70,22 @@ router.get("/season/:seasonId/list", async (req, res) => {
     req.socket.remoteAddress ||
     null;
 
+  const seasonId = Number(req.params.seasonId);
+  if (!Number.isSafeInteger(seasonId) || seasonId <= 0) {
+    return res.status(400).json({ message: "seasonId must be a positive integer" });
+  }
+
   try {
     const attacks = await db.pool.query(
         `SELECT
-           a.ID,
-           a.Season,
-           ss.Name,
-           a.Round
+           a.*,
+           ss.Name
          FROM c3_ATTACK a
                 JOIN c3_STARSYSTEM ss
                      ON ss.ID = a.StarSystemID
          WHERE a.Season = ?
-           AND a.FactionID_Winner IS NULL`,
-        [req.params.seasonId]
+         ORDER BY a.Round DESC, a.ID DESC`,
+        [seasonId]
     );
 
     if(attacks.length === 0) {
@@ -91,9 +94,45 @@ router.get("/season/:seasonId/list", async (req, res) => {
       });
     }
 
-    const c3Attacks = attacks.map(
-      (attack) => new C3Attack(attack)
+    // Aggregate before resolving names: multiple awards must not multiply PCP.
+    const scores = await db.pool.query(
+      `SELECT s.AttackID, s.FactionID, SUM(s.PCP) AS pcp
+       FROM c3_SCORE s
+       JOIN c3_ATTACK a ON a.ID = s.AttackID AND a.Season = s.SeasonId
+       WHERE a.Season = ?
+       GROUP BY s.AttackID, s.FactionID`,
+      [seasonId]
     );
+    const scoresByAttack = new Map();
+    for (const score of scores) {
+      const attackId = Number(score.AttackID);
+      if (!scoresByAttack.has(attackId)) scoresByAttack.set(attackId, new Map());
+      scoresByAttack.get(attackId).set(Number(score.FactionID), Number(score.pcp));
+    }
+    const factionIdsByAttack = new Map(attacks.map((attack) => [
+      Number(attack.ID),
+      [...new Set([
+        ...C3Attack.factionIds(attack),
+        ...(scoresByAttack.get(Number(attack.ID))?.keys() || []),
+      ])].filter((id) => Number.isSafeInteger(id) && id > 0),
+    ]));
+    const factionIds = [...new Set([...factionIdsByAttack.values()].flat())];
+    const factions = factionIds.length === 0 ? [] : await db.pool.query(
+      `SELECT ID, Name_de, Name_en FROM c3_FACTION
+       WHERE ID IN (${factionIds.map(() => "?").join(", ")})`,
+      factionIds
+    );
+    const factionsById = new Map(factions.map((faction) => [Number(faction.ID), faction]));
+    const c3Attacks = attacks.map((attack) => new C3Attack(attack,
+      factionIdsByAttack.get(Number(attack.ID)).map((id) => ({
+        faction_id: id,
+        name: {
+          de: factionsById.get(id)?.Name_de ?? null,
+          en: factionsById.get(id)?.Name_en ?? null,
+        },
+        pcp: scoresByAttack.get(Number(attack.ID))?.get(id) ?? 0,
+      }))
+    ));
 
     logger.info(
       "c3_ATTACK records for season " +

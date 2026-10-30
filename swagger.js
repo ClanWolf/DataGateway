@@ -15,6 +15,19 @@ const doc = {
   schemes: ['https'],
   basePath: '/',
   definitions: {
+    C3Attack: {
+      id: 21,
+      season: 1,
+      name: 'Tukayyid',
+      round: 3,
+      winnerfaction_id: 7,
+      has_winner: true,
+      factions: [{
+        faction_id: 7,
+        name: { de: 'Rote Garde', en: 'Red Guard' },
+        pcp: 12.5,
+      }],
+    },
     AuxFight: {
       type: 'object',
       properties: {
