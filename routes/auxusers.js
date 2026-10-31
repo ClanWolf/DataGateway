@@ -72,7 +72,7 @@ router.get("/highscore", async (req, res) => {
         GROUP BY fu.user_id, f.id_fight, f.fight_teamsize
       ) completed ON completed.user_id = u.id_user
       GROUP BY u.id_user, u.username
-      ORDER BY pcp DESC, u.username ASC, u.id_user ASC
+      ORDER BY pcp DESC, fights DESC, u.username ASC, u.id_user ASC
     `, [Number(references[0].Value)]);
     let rank = 0;
     let previousPcp;
